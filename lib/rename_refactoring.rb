@@ -25,24 +25,7 @@ class RenameRefactoring
       def rename_cmd(src, dst); "mv #{src} #{dst}"; end
     end
 
-    renames = {
-      "test/unit/#{@from}_test.rb" => "test/unit/#{@to}_test.rb",
-      "test/functional/#{@from.pluralize}_controller_test.rb" => "test/functional/#{@to.pluralize}_controller_test.rb",
-      "test/fixtures/#{@from.pluralize}.yml" => "test/fixtures/#{@to.pluralize}.yml",
-      "app/views/#{@from.pluralize}" => "app/views/#{@to.pluralize}",
-      "app/models/#{@from}.rb" => "app/models/#{@to}.rb",
-      "app/helpers/#{@from.pluralize}_helper.rb" => "app/helpers/#{@to.pluralize}_helper.rb",
-      "app/controllers/#{@from.pluralize}_controller.rb" => "app/controllers/#{@to.pluralize}_controller.rb",
-    }
-
-    puts "Renaming files and directories:"
-    renames.each do |src, dst|
-      if File.exist? src
-        cmd = rename_cmd(src, dst)
-        puts cmd
-        `#{cmd}`
-      end
-    end
+    renames = {}
 
     puts "\nReplacing class and variables:"
     replaces = {
@@ -59,16 +42,16 @@ class RenameRefactoring
 
     Find.find(".") do |path|
       # reject no source codes directories and SCM magic directories
-      Find.prune if path =~ /((^\.\/(vendor|log|script|tmp|db))|\.(git|svn))$/
+      Find.prune if path =~ /((^\.\/(vendor|log|script|tmp|db|lib\/tasks|Rakefile))|\.(git|svn))$/
 
       if File.file? path
         content = File.read(path)
         # print replacing lines
-        content.each_with_index do |line, idx|
-          line.scan(/#{pattern}/).each do
-            puts "#{path}:#{idx+1}: #{line}"
-          end
-        end
+        # content.each_with_index do |line, idx|
+        #   line.scan(/#{pattern}/).each do
+        #     puts "#{path}:#{idx+1}: #{line}"
+        #   end
+        # end
 
         replaced = content.gsub!(/#{pattern}/){ "#{$1}#{replaces[$2]}#{$3}"}
         unless replaced.nil?
@@ -77,6 +60,19 @@ class RenameRefactoring
             out.print content
           end
         end
+      end
+      
+      if File.basename(path) =~ /#{@from}/
+        renames.merge! path => File.join(File.dirname(path), File.basename(path).gsub(/#{@from}/, @to))
+      end
+    end
+
+    puts "Renaming files and directories:"
+    renames.each do |src, dst|
+      if File.exist? src
+        cmd = rename_cmd(src, dst)
+        puts "RENAME #{cmd}"
+        `#{cmd}`
       end
     end
 
